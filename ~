@@ -1,0 +1,12 @@
+[
+	{
+		"title": "Cocinar",
+		"category": "daily",
+		"isComplete": false
+	},
+	{
+		"title": "Sacar la basura",
+		"category": "daily",
+		"isComplete": true
+	}
+]
