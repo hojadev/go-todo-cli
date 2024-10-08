@@ -38,11 +38,10 @@ func writeDataFromJson(tasks ToDoApp) error {
 	return nil
 }
 
-func readDataFromJson() ToDoApp {
+func readDataFromJson() (ToDoApp, error) {
 	file, err := os.OpenFile("tasks.json", os.O_RDWR|os.O_CREATE, 0664)
 	if err != nil {
-		fmt.Println("Ha habido un error para abrir el archivo", err)
-		return ToDoApp{}
+		return ToDoApp{}, errors.New("Ha ocurrido un error al abrir el archivo")
 	}
 	defer file.Close()
 
@@ -51,11 +50,10 @@ func readDataFromJson() ToDoApp {
 	err = decoder.Decode(&taskApp)
 
 	if err != nil {
-		fmt.Println("Ha habido un error de codificacion")
-		return ToDoApp{}
+		return ToDoApp{}, errors.New("Ha habido un error con la codificacion a JSON para guardar")
 	}
 
-	return taskApp
+	return taskApp, nil
 }
 
 // TASKS FUNCTIONS
@@ -71,8 +69,13 @@ func showHelp() {
 -s	change status	Pasa la tarea de False a True y viceversa, todo -s <Id>`)
 }
 
-func createTask(title, category string) {
-	tasks := readDataFromJson()
+func createTask(title, category string) error {
+	tasks, err := readDataFromJson()
+
+	if err != nil {
+		return err
+	}
+
 	newTask := Task{
 		Title:      title,
 		Category:   category,
@@ -80,18 +83,23 @@ func createTask(title, category string) {
 	}
 
 	tasks = append(tasks, newTask)
-	err := writeDataFromJson(tasks)
+	err = writeDataFromJson(tasks)
 
 	if err != nil {
-		fmt.Printf("Ha ocurrido un error: %v", err)
+		return err
 	}
 
 	tasks = ToDoApp{newTask}
 	formatedText(tasks)
+	return nil
 }
 
 func deleteTask(id string) error {
-	tasks := readDataFromJson()
+	tasks, err := readDataFromJson()
+
+	if err != nil {
+		return err
+	}
 	newTasks := ToDoApp{}
 
 	number, err := strconv.Atoi(id)
@@ -110,6 +118,7 @@ func deleteTask(id string) error {
 		}
 		newTasks = append(newTasks, task)
 	}
+
 	err = writeDataFromJson(newTasks)
 	if err != nil {
 		return err
@@ -119,14 +128,19 @@ func deleteTask(id string) error {
 }
 
 func updateTask(id, newTitle, category string) error {
-	tasks := readDataFromJson()
+	tasks, err := readDataFromJson()
+
+	if err != nil {
+		return err
+	}
 
 	if len(tasks) == 0 {
 		return errors.New("No hay tareas creadas, utiliza todo -c <Title> <Category> para crear una")
 	}
 
 	idUpdatedTask, err := strconv.Atoi(id)
-	if err != nil || len(tasks) < idUpdatedTask {
+
+	if err != nil && len(tasks) < idUpdatedTask {
 		return errors.New("El argumento <id> no es un numero o fuera de rango")
 	}
 
@@ -137,17 +151,22 @@ func updateTask(id, newTitle, category string) error {
 	err = writeDataFromJson(tasks)
 
 	if err != nil {
-		return errors.New("No se ha podido escribir en el archivo tasks.json")
+		return err
 	}
 
 	tasks = ToDoApp{newTask}
-	fmt.Println("Se ha actualizado la tarea")
+	fmt.Println("Se ha actualizado la tarea: ")
 	formatedText(tasks)
+
 	return nil
 }
 
 func completeTask(id string) error {
-	tasks := readDataFromJson()
+	tasks, err := readDataFromJson()
+
+	if err != nil {
+		return err
+	}
 
 	if len(tasks) == 0 {
 		return errors.New("No hay tareas agregadas")
@@ -155,11 +174,11 @@ func completeTask(id string) error {
 
 	idCompleteTask, err := strconv.Atoi(id)
 	if err != nil {
-		return errors.New("Ha habido un error en convertir el id a un int")
+		return errors.New("Error en convertir el id a un int")
 	}
 
 	if len(tasks) < idCompleteTask {
-		return errors.New("id fuera de rango.")
+		return errors.New("Id fuera de rango.")
 	}
 
 	tasks[idCompleteTask].IsComplete = !tasks[idCompleteTask].IsComplete
@@ -170,7 +189,7 @@ func completeTask(id string) error {
 		return err
 	}
 
-	fmt.Println("\nHaz cambiado el status de la tarea")
+	fmt.Println("\nHaz cambiado el status de la tarea: ")
 	formatedText(tasks)
 	return nil
 }
@@ -208,15 +227,22 @@ func formatedText(tasks ToDoApp) {
 	}
 }
 
-func listTask() {
-	tasks := readDataFromJson()
-	//maxLeght(tasks)
+func listTask() error {
+	tasks, err := readDataFromJson()
+
+	if err != nil {
+		return err
+	}
 	formatedText(tasks)
+	return nil
 }
 
 func main() {
 	if len(os.Args) <= 1 {
-		listTask()
+		err := listTask()
+		if err != nil {
+			fmt.Printf("Ha ocurrido un error: %v", err)
+		}
 		return
 	}
 
@@ -224,21 +250,28 @@ func main() {
 	case "-h":
 		showHelp()
 	case "-l":
-		listTask()
+		err := listTask()
+		if err != nil {
+			fmt.Printf("Ha ocurrido un error: %v", err)
+		}
 	case "-a":
 		if len(os.Args) < 4 {
-			fmt.Println("Invalid Args: todo -a <title> <category>")
+			fmt.Println("Faltan argumentos: todo -a <title> <category>")
 			return
 		}
-		createTask(os.Args[2], os.Args[3])
+
+		err := createTask(os.Args[2], os.Args[3])
+		if err != nil {
+			fmt.Printf("Ha ocurrido un error: %v", err)
+		}
 	case "-d":
 		if len(os.Args) < 3 {
-			fmt.Println("Invalid Args: todo -d <id>")
+			fmt.Println("Faltan argumentos: todo -d <id>")
 			return
 		}
 		err := deleteTask(os.Args[2])
 		if err != nil {
-			fmt.Printf("Ha habido un error: %v", err)
+			fmt.Printf("Ha ocurrido un error: %v", err)
 		}
 	case "-u":
 
@@ -248,16 +281,16 @@ func main() {
 		}
 		err := updateTask(os.Args[2], os.Args[3], os.Args[4])
 		if err != nil {
-			fmt.Printf("Ha habido un error: %v", err)
+			fmt.Printf("Ha ocurrido un error: %v", err)
 		}
 	case "-s":
 		if len(os.Args) < 3 {
-			fmt.Println("Faltan Argumentos: todo -s <Id>")
+			fmt.Println("Faltan argumentos: todo -s <Id>")
 			return
 		}
 		err := completeTask(os.Args[2])
 		if err != nil {
-			fmt.Printf("Ha habido un error: %v", err)
+			fmt.Printf("Ha ocurrido un error: %v", err)
 		}
 	}
 
